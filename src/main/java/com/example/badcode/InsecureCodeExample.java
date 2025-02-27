@@ -18,7 +18,7 @@ import java.util.Base64;
 // import javax.servlet.http.Cookie;
 // import javax.servlet.http.HttpServletResponse;
 
-public class SecurityHotspotsExample {
+public class InsecureCodeExample {
 
     /**
      * 1. Eliminamos la llave/credencial embebida (hardcoded) 
