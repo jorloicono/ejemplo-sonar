@@ -1,24 +1,30 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" 
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
   
   <modelVersion>4.0.0</modelVersion>
   
   <groupId>com.example</groupId>
-  <artifactId>bad-code-example</artifactId>
+  <artifactId>insecure-app</artifactId>
   <version>1.0-SNAPSHOT</version>
   <packaging>jar</packaging>
-  <name>Bad Code Example</name>
+  <name>Insecure App</name>
 
   <properties>
-    <!-- Ajusta la versión de Java que quieras usar -->
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
   </properties>
 
   <dependencies>
-    <!-- Si necesitas librerías adicionales, añádelas aquí -->
+    <!-- Dependencias necesarias para LDAP -->
+    <dependency>
+      <groupId>com.sun.jndi</groupId>
+      <artifactId>ldap</artifactId>
+      <version>1.2.4</version>
+      <scope>system</scope>
+      <systemPath>${java.home}/../lib/ext/ldap.jar</systemPath>
+      <!-- Ajustar según tu entorno; solo ejemplo -->
+    </dependency>
   </dependencies>
-
 </project>
