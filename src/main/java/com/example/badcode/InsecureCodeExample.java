@@ -1,146 +1,180 @@
-package com.example.securityissues;
+package com.example.securityhotspots;
 
-import javax.net.ssl.*;
-import javax.naming.*;
-import javax.naming.directory.*;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.net.URL;
-import java.security.cert.X509Certificate;
-import java.util.Hashtable;
-import java.util.Random;
+// Para usar HTTPS en lugar de HTTP, importamos:
+import javax.net.ssl.HttpsURLConnection;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;  // Uso de SecureRandom si necesitamos generar tokens/llaves
+import java.util.Arrays;
+import java.util.Base64;
 
-public class InsecureCodeExample {
+// Opcional si usaras servlets:
+// import javax.servlet.http.Cookie;
+// import javax.servlet.http.HttpServletResponse;
 
-    // 1. Hardcoded credentials (credenciales embebidas)
-    private static final String SECRET_PASSWORD = "SuperSecret123!";
-    
-    public static void main(String[] args) {
-        
-        // Ejemplo de log de información sensible
-        System.out.println("Contraseña embebida: " + SECRET_PASSWORD);
-
-        // 2. Uso inseguro de Random (no criptográficamente seguro)
-        Random random = new Random();
-        int insecureKey = random.nextInt();
-        System.out.println("Llave generada (insegura): " + insecureKey);
-
-        // 3. Conexión SSL sin validación de certificados
-        insecureSslConnection();
-
-        // 4. Inyección de comandos (Command Injection)
-        //    Simulamos que "args[0]" proviene de una entrada de usuario
-        if (args.length > 0) {
-            runCommand(args[0]);
-        }
-
-        // 5. Path Traversal (sin sanitizar el nombre de archivo)
-        //    Simulamos que "args[1]" podría contener ../ o rutas peligrosas
-        if (args.length > 1) {
-            pathTraversal(args[1]);
-        }
-
-        // 6. LDAP Injection (filtros LDAP inseguros)
-        if (args.length > 2) {
-            ldapSearch(args[2]);
-        }
-    }
+public class SecurityHotspotsExample {
 
     /**
-     * Conexión SSL con un TrustManager que acepta cualquier certificado,
-     * sin validación (inseguro frente a ataques MITM).
+     * 1. Eliminamos la llave/credencial embebida (hardcoded) 
+     *    y, en su lugar, ofrecemos un método para cargarla 
+     *    de una configuración segura o de variables de entorno.
      */
-    public static void insecureSslConnection() {
+    // private static final String HARD_CODED_KEY = "mySecretAESKey"; // Eliminado
+
+    public static void main(String[] args) {
         try {
-            // Crea un trust manager que no valida cadenas de certificados
-            TrustManager[] trustAllCerts = new TrustManager[] {
-                new X509TrustManager() {
-                    public X509Certificate[] getAcceptedIssuers() { return null; }
-                    public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-                    public void checkServerTrusted(X509Certificate[] certs, String authType) {}
-                }
-            };
+            // Reflection corregido: limitamos las clases permitidas a un whitelist
+            safeReflectionExample("java.lang.String");
 
-            SSLContext sc = SSLContext.getInstance("SSL");
-            sc.init(null, trustAllCerts, new java.security.SecureRandom());
-            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+            // Uso de SHA-256 en lugar de MD5
+            secureHash("textoEjemplo");
 
-            // Ignora la verificación del nombre del host
-            HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
+            // Evitamos loguear contraseñas reales; en su lugar, las enmascaramos.
+            logSensitiveData("password123");
 
-            // Ahora hace una petición insegura a un sitio HTTPS
-            URL url = new URL("https://example.com/");
-            HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
-            
-            BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-            String inputLine;
-            while ((inputLine = in.readLine()) != null) {
-                System.out.println("Recibido: " + inputLine);
-            }
-            in.close();
+            // Leer variables de entorno es normal, pero evitamos imprimir secretos
+            safeEnvVarUsage();
+
+            // Uso de HTTPS en lugar de HTTP
+            secureHttpsConnection();
+
+            // Ejemplo: si usas un contenedor Servlet, podrías probar createSecureCookie(...)
+            // createSecureCookie(response);
+
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     /**
-     * Inyección de comandos: se ejecuta directamente el comando que llega como parámetro.
-     * Un atacante podría enviar algo como "rm -rf /" en sistemas Unix o comandos maliciosos en Windows.
+     * Ejemplo de cargar una clave desde un método seguro (no se embebe en el código).
      */
-    public static void runCommand(String command) {
-        try {
-            Runtime.getRuntime().exec(command);
-            System.out.println("Comando ejecutado: " + command);
-        } catch (IOException e) {
-            e.printStackTrace();
+    private static String getEncryptionKey() {
+        // Este método podría acceder a un gestor de configuraciones seguro 
+        // o usar variables de entorno. Aquí simulamos una lectura "dummy".
+        String key = System.getenv("APP_ENCRYPTION_KEY");
+        if (key == null || key.isEmpty()) {
+            // En producción, maneja adecuadamente la ausencia de la variable
+            throw new IllegalStateException("No se encontró la clave de encriptación en variables de entorno");
+        }
+        return key;
+    }
+
+    /**
+     * 2. Reflexión segura: restringimos las clases que se pueden cargar
+     *    mediante un "whitelist" para minimizar el riesgo.
+     */
+    public static void safeReflectionExample(String className) throws Exception {
+        // Definimos un conjunto de clases permitidas
+        final String[] allowedClasses = {
+            "java.lang.String",
+            "java.lang.Integer",
+            "java.util.ArrayList"
+            // Agrega las que tu aplicación realmente necesite
+        };
+
+        // Verificamos que className esté en la lista blanca
+        if (!Arrays.asList(allowedClasses).contains(className)) {
+            throw new SecurityException("Intento de cargar una clase no permitida: " + className);
+        }
+
+        // Si pasó la validación, se permite la reflexión
+        Class<?> clazz = Class.forName(className);
+        Object instance = clazz.getDeclaredConstructor().newInstance();
+        System.out.println("Reflexión invocada de forma segura en la clase: " + className + ". Instancia: " + instance);
+    }
+
+    /**
+     * 3. Uso de algoritmo de hash más robusto (SHA-256 en lugar de MD5).
+     */
+    public static void secureHash(String input) throws NoSuchAlgorithmException {
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
+        String base64Hash = Base64.getEncoder().encodeToString(hash);
+        System.out.println("Hash SHA-256: " + base64Hash);
+    }
+
+    /**
+     * 4. Logging de datos sensibles de forma enmascarada.
+     */
+    public static void logSensitiveData(String password) {
+        // En lugar de imprimir la contraseña en texto plano,
+        // podemos "enmascararla" o eliminarla de los logs.
+        String masked = maskPassword(password);
+        System.out.println("Se recibió contraseña (enmascarada): " + masked);
+    }
+
+    /**
+     * Ejemplo de enmascarado de contraseña, mostrando solo 2 caracteres.
+     */
+    private static String maskPassword(String password) {
+        if (password == null || password.length() <= 2) {
+            return "***";
+        }
+        return password.substring(0, 2) + "****";
+    }
+
+    /**
+     * 5. Lectura de variables de entorno de forma segura.
+     *    No imprimimos el contenido si es sensible.
+     */
+    public static void safeEnvVarUsage() {
+        String secret = System.getenv("APP_SECRET");
+        if (secret != null) {
+            // En lugar de imprimir, solo mostramos un mensaje de confirmación.
+            System.out.println("Variable de entorno APP_SECRET detectada (no se muestra en logs).");
+        } else {
+            System.out.println("No se encontró variable de entorno APP_SECRET.");
         }
     }
 
     /**
-     * Path Traversal: construimos la ruta de archivo con la entrada del usuario
-     * y leemos su contenido sin validación ni sanitización.
+     * 6. Conexión HTTPS en lugar de HTTP para proteger la información en tránsito.
      */
-    public static void pathTraversal(String filename) {
-        File file = new File("/var/data/" + filename);
-        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+    public static void secureHttpsConnection() throws IOException {
+        // Suponiendo que "example.com" soporta HTTPS.
+        URL url = new URL("https://example.com/login?user=admin&pass=admin123");
+        
+        // Nota: En un entorno real, no incluyas credenciales en la URL (parte query).
+        // Usa POST con cuerpo, cabeceras seguras o un token con expiración.
+        
+        HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+
+        int responseCode = connection.getResponseCode();
+        System.out.println("Código de respuesta HTTPS: " + responseCode);
+
+        // Leer la respuesta si es necesario
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
             String line;
             while ((line = br.readLine()) != null) {
-                System.out.println("Contenido: " + line);
+                // Procesar la respuesta...
+                // Aquí solo imprimimos con fines de demostración
+                System.out.println(line);
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
     /**
-     * LDAP Injection: concatenación directa de la entrada del usuario en el filtro LDAP.
-     * Un atacante podría manipular el filtro y obtener información adicional o causar errores.
+     * 7. Creación de cookies con banderas de seguridad (opcional).
+     *
+     * Descomenta si usas servlets y tienes la dependencia en tu proyecto:
+     *
+     * public static void createSecureCookie(HttpServletResponse response) {
+     *     Cookie cookie = new Cookie("sessionId", "12345");
+     *     cookie.setPath("/");
+     *     // Aseguramos la cookie
+     *     cookie.setHttpOnly(true);  // Previene acceso desde JavaScript
+     *     cookie.setSecure(true);    // Solo se envía por HTTPS
+     *     cookie.setMaxAge(3600);    // Define un tiempo de expiración (seguridad adicional)
+     *
+     *     response.addCookie(cookie);
+     * }
      */
-    public static void ldapSearch(String userFilter) {
-        try {
-            Hashtable<String,String> env = new Hashtable<>();
-            env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.ldap.LdapCtxFactory");
-            env.put(Context.PROVIDER_URL, "ldap://localhost:389");
-            env.put(Context.SECURITY_AUTHENTICATION, "simple");
-            env.put(Context.SECURITY_PRINCIPAL, "cn=admin,dc=example,dc=com");
-            env.put(Context.SECURITY_CREDENTIALS, "adminPassword");
-
-            DirContext ctx = new InitialDirContext(env);
-
-            // Filtro inseguro: "(uid=" + userFilter + ")"
-            String searchFilter = "(uid=" + userFilter + ")";
-            SearchControls controls = new SearchControls();
-            controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
-
-            NamingEnumeration<?> results = ctx.search("dc=example,dc=com", searchFilter, controls);
-
-            while (results.hasMore()) {
-                SearchResult sr = (SearchResult) results.next();
-                System.out.println("Resultado LDAP: " + sr.getNameInNamespace());
-            }
-
-            ctx.close();
-        } catch (NamingException e) {
-            e.printStackTrace();
-        }
-    }
 }
